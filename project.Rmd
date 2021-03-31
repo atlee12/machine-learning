@@ -1,0 +1,143 @@
+---
+title: "Machine Learning Project"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Background
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset). 
+
+# Data 
+The training data for this project are available here: 
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har. If you use the document you create for this class for any purpose please cite them as they have been very generous in allowing their data to be used for this kind of assignment. 
+
+# What you should submit
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases. 
+
+
+# Load packages and data
+
+```{r, results="hide", warning=FALSE, message=FALSE}
+library(caret)
+library(dplyr)
+library(randomForest)
+
+```
+
+
+
+```{r}
+training_full <-  read.csv("~/coursera/course_project/machine_learning/pml-training.csv")
+testing_full <-  read.csv("~/coursera/course_project/machine_learning/pml-testing.csv")
+
+
+```
+
+
+# Clean up data
+There's a large chunk of missingness in a number of variables. Remove variables with any missingness, and also remove identifiers that are unnecessary. Make sure to do this in both the training and testing data.
+```{r}
+
+training_full <- training_full %>%
+  select_if(~ !any(.=="")) %>%
+  select(-X, -user_name, -raw_timestamp_part_1, -raw_timestamp_part_2, -cvtd_timestamp)
+
+# Make sure all columns are the same type
+num.cols <- training_full %>%
+  select(-new_window, -classe) %>%
+  names()
+training_full[num.cols] <- data.frame(lapply(training_full[num.cols], function(x) as.numeric(x)))
+
+
+testing_full <- testing_full %>%
+  select_if(~ !any(.=="")) %>%
+  select(-X, -user_name, -raw_timestamp_part_1, -raw_timestamp_part_2, -cvtd_timestamp)
+
+# Make sure all columns are the same type
+testing_full[num.cols] <- data.frame(lapply(testing_full[num.cols], function(x) as.numeric(x)))
+
+
+```
+
+
+
+Set seed for reproducibility. I will partition the training data further into a sub-training set and a sub-testing set. I'll keep 75% in the training, and 25% in the testing. I will fit two different models (decision tree and random forest) on the training set, and test them on the testing set.
+
+```{r}
+
+set.seed(66)
+
+inTrain = createDataPartition(training_full$classe, p = 3/4)[[1]]
+
+training = training_full[inTrain,]
+
+testing = training_full[-inTrain,]
+
+
+```
+
+
+
+
+# Decision tree
+```{r}
+
+fit1 <- train(classe~., method="rpart", data=training)
+pred1 <- predict(fit1, testing)
+
+# Testing accuracy
+confusionMatrix(pred1, testing$classe)
+
+
+```
+
+# Random forest
+
+```{r}
+
+# This method is too slow...
+# fit2 <- train(classe~., method="rf", data=training)
+fit2 <- randomForest(classe~., data=training)
+pred2 <- predict(fit2, testing)
+
+# Testing accuracy
+confusionMatrix(pred2, testing$classe)
+
+
+```
+
+
+# Summary
+The random forest does a better job than the decision tree, and will be applied to the 20 test cases. The out of sample error rate is 0.0016.
+
+
+
+
+```{r}
+# Error - types of predictors in new data do not match that of the training data
+# Will use this trick to make sure they're the same type
+testing_full <- rbind(training[1, -55] , testing_full[-55])
+testing_full <- testing_full[-1,]
+    
+pred <- predict(fit2, testing_full)
+
+pred
+
+```
+
+
+
+
+
+
+
